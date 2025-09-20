@@ -3,8 +3,10 @@ package letscode;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -14,6 +16,7 @@ import java.util.concurrent.TimeoutException;
 class Server {
     private final static int BUFFER_SIZE = 256;
     private AsynchronousServerSocketChannel server;
+    private final HttpHandler handler;
     private final String HEADERS =
             "HTTP/1.1 200 OK\r\n" +
                     "Server: silver\r\n" +
@@ -21,6 +24,10 @@ class Server {
                     "Content-Length: %s\r\n" +
                     "Connection: close\r\n" +
                     "\r\n";
+
+    Server(HttpHandler handler) {
+        this.handler = handler;
+    }
 
     public void bootstrap() {
         try {
@@ -37,26 +44,32 @@ class Server {
     }
 
     private void handleClient(Future<AsynchronousSocketChannel> future) throws InterruptedException, ExecutionException, TimeoutException, IOException {
-        System.out.println("new client thread");
+        System.out.println("new client connection");
 
-        AsynchronousSocketChannel clientChannel = future.get(30, TimeUnit.SECONDS);
+        AsynchronousSocketChannel clientChannel = future.get();
+
         while (clientChannel != null && clientChannel.isOpen()) {
             ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
             StringBuilder builder = new StringBuilder();
             boolean keepReading = true;
 
             while (keepReading) {
-                clientChannel.read(buffer).get();
+                int readResult = clientChannel.read(buffer).get();
 
-                int position = buffer.position();
-                keepReading = position == BUFFER_SIZE;
+                keepReading = readResult == BUFFER_SIZE;
+                buffer.flip();
 
-                byte[] array = keepReading ? buffer.array() : Arrays.copyOfRange(buffer.array(), 0, position);
+                CharBuffer charBuffer = StandardCharsets.UTF_8.decode(buffer);
+                builder.append(charBuffer);
 
-                builder.append(new String(array));
                 buffer.clear();
             }
-            String body = "<html><body><h1>Hello, silver</h1></body></html>";
+
+            HttpRequest request = new HttpRequest(builder.toString());
+            HttpResponse response = new HttpResponse();
+
+            String body = this.handler.handle(request, response);
+
             String page = String.format(HEADERS, body.length()) + body;
             ByteBuffer resp = ByteBuffer.wrap(page.getBytes());
             clientChannel.write(resp);

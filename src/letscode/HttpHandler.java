@@ -1,5 +1,5 @@
 package letscode;
 
 public interface HttpHandler {
-    String handle(HttpRequest httpRequest, HttpResponse httpResponce);
+    String handle(HttpRequest httpRequest, HttpResponse httpResponse);
 }
