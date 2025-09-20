@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.util.concurrent.ExecutionException;
@@ -13,12 +14,13 @@ import java.util.concurrent.TimeoutException;
 
 public class Main {
     public static void main(String[] args) throws UnknownHostException {
-        new Server();
+        new Server().bootstrap();
 
     }
 }
 
 class Server {
+    private final static int BUFFER_SIZE = 256;
     private AsynchronousServerSocketChannel server;
 
     public void bootstrap() {
@@ -31,7 +33,13 @@ class Server {
 
             AsynchronousSocketChannel clientChannel = future.get(30, TimeUnit.SECONDS);
             while (clientChannel != null && clientChannel.isOpen()) {
-                
+                ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
+
+                clientChannel.read(buffer).get();
+                buffer.flip();
+                clientChannel.write(buffer);
+
+                clientChannel.close();
             }
 
         } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
