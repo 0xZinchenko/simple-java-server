@@ -17,13 +17,6 @@ class Server {
     private final static int BUFFER_SIZE = 256;
     private AsynchronousServerSocketChannel server;
     private final HttpHandler handler;
-    private final String HEADERS =
-            "HTTP/1.1 200 OK\r\n" +
-                    "Server: silver\r\n" +
-                    "Content-Type: text/html\r\n" +
-                    "Content-Length: %s\r\n" +
-                    "Connection: close\r\n" +
-                    "\r\n";
 
     Server(HttpHandler handler) {
         this.handler = handler;
@@ -68,12 +61,33 @@ class Server {
             HttpRequest request = new HttpRequest(builder.toString());
             HttpResponse response = new HttpResponse();
 
-            String body = this.handler.handle(request, response);
+            if (handler != null) {
+                try {
+                    String body = this.handler.handle(request, response);
 
-            String page = String.format(HEADERS, body.length()) + body;
-            ByteBuffer resp = ByteBuffer.wrap(page.getBytes());
+                    if (body != null && !body.isBlank()) {
+                        if (response.getHeaders().get("Content-Type") == null) {
+                            response.addHeader("Content-Type", "text/html; charset=utf-8");
+                        }
+                        response.setBody(body);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    response.setStatusCode(500);
+                    response.setStatus("Internal server error");
+                    response.addHeader("Content-Type", "text/html; charset=utf-8");
+                    response.setBody("<html><body><h1>Error happens</h1></body><html>");
+                }
+            } else {
+                response.setStatusCode(404);
+                response.setStatus("Not found");
+                response.addHeader("Content-Type", "text/html; charset=utf-8");
+                response.setBody("<html><body><h1>Resource not found</h1></body><html>");
+
+            }
+
+            ByteBuffer resp = ByteBuffer.wrap(response.getBytes());
             clientChannel.write(resp);
-
 
             clientChannel.close();
         }

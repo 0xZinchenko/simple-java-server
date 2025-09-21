@@ -1,11 +1,12 @@
 package letscode;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class HttpResponse {
     private final static String NEW_LINE = "\r\n";
 
-    private Map<String, String> headers;
+    private Map<String, String> headers = new HashMap<>();
     private String body = "";
     private int statusCode = 200;
     private String status = "OK";
